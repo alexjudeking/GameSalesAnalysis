@@ -1,0 +1,114 @@
+---
+title: "Game Sales Analysis"
+author: "Alexander King"
+date: "March 21, 2019"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#CSV of Video Game Sales
+Importing Video Game Sales
+```{r echo=FALSE}
+  dataset <- as.data.frame(read.csv("C:\\Users\\laifu\\Desktop\\CIS 585 Video Game Sales Analysis\\Video_Games_Sales_as_at_22_Dec_2016.csv"))
+  sales = subset(dataset, select= -c(Year_of_Release, Publisher, NA_Sales, EU_Sales, JP_Sales, Other_Sales, Developer, Rating))
+  print(sales)
+  
+```
+
+#Reddit API Data
+Retrieving Data from Reddit's API
+```{r echo=FALSE}
+  
+
+```
+
+#Twitch API Data
+Retrieving Data from Twitch TV's API
+```{r echo=FALSE}
+  require(jsonlite)
+  require(dplyr)
+  require(plyr)
+  require(rTwitchAPI)
+  twitch_auth("3s4qog8agruu7dz6gquv0nsk2mg7fd")
+  get_top_games()
+  i <- 1
+  #Only GTA V at the moment for testing purposes
+  while(hasNext(get_streams(game_id="32982"))){
+    gamestreams <- get_streams(game_id="32982")
+    print(count(gamestreams[i:i+20], vars="id"))
+    i <- i+1
+  }
+  gamestreams <- get_streams(game_id="32982")
+  print(count(gamestreams))
+```
+
+#Giant Bomb API Data
+Retrieving Data from Giant Bomb's API
+```{r echo=FALSE}
+  require(giantbomb)
+  Sys.setenv("GB_KEY" = "535c08b192ce6572613e8db5cdc612d3e366a88f")
+  gb_games(
+    n = 10,
+    filter= "name:grand theft auto",
+    sort = "date_added:desc",
+    field_list = c("date_added", "name", "id")
+    )
+  #only GTA at the moment for testing purposes
+  review <- gb_reviews(
+    n = 1,
+    filter= "game:36765",
+    field_list = c("score", "id","game")
+  )
+  print(review)
+
+```
+
+To learn more, see [Interactive Documents](http://rmarkdown.rstudio.com/authoring_shiny.html).
+
+## Inputs and Outputs
+
+You can embed Shiny inputs and outputs in your document. Outputs are automatically updated whenever inputs change.  This demonstrates how a standard R plot can be made interactive by wrapping it in the Shiny `renderPlot` function. The `selectInput` and `sliderInput` functions create the input widgets used to drive the plot.
+
+```{r eruptions, echo=FALSE}
+inputPanel(
+  selectInput("n_breaks", label = "Number of bins:",
+              choices = c(10, 20, 35, 50), selected = 20),
+  
+  sliderInput("bw_adjust", label = "Bandwidth adjustment:",
+              min = 0.2, max = 2, value = 1, step = 0.2)
+)
+
+renderPlot({
+  hist(faithful$eruptions, probability = TRUE, breaks = as.numeric(input$n_breaks),
+       xlab = "Duration (minutes)", main = "Geyser eruption duration")
+  
+  dens <- density(faithful$eruptions, adjust = input$bw_adjust)
+  lines(dens, col = "blue")
+})
+```
+
+## Embedded Application
+
+It's also possible to embed an entire Shiny application within an R Markdown document using the `shinyAppDir` function. This example embeds a Shiny application located in another directory:
+
+```{r tabsets, echo=FALSE}
+shinyAppDir(
+  system.file("examples/06_tabsets", package = "shiny"),
+  options = list(
+    width = "100%", height = 550
+  )
+)
+```
+
+Note the use of the `height` parameter to determine how much vertical space the embedded application should occupy.
+
+You can also use the `shinyApp` function to define an application inline rather then in an external directory.
+
+In all of R code chunks above the `echo = FALSE` attribute is used. This is to prevent the R code within the chunk from rendering in the document alongside the Shiny components.
+
+
+
