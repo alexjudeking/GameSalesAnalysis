@@ -35,15 +35,11 @@ Retrieving Data from Twitch TV's API
   require(rTwitchAPI)
   twitch_auth("3s4qog8agruu7dz6gquv0nsk2mg7fd")
   get_top_games()
-  i <- 1
-  #Only GTA V at the moment for testing purposes
-  while(hasNext(get_streams(game_id="32982"))){
-    gamestreams <- get_streams(game_id="32982")
-    print(count(gamestreams[i:i+20], vars="id"))
-    i <- i+1
-  }
-  gamestreams <- get_streams(game_id="32982")
-  print(count(gamestreams))
+  twitch_data <- as.data.frame(get_streams(game_id=32982))
+  gamestreams <- subset(twitch_data, select = -c(id, user_name, game_id ,community_ids ,type,started_at,language,thumnail_url,tag_ids))
+  print(gamestreams)
+  
+  
 ```
 
 #Giant Bomb API Data
@@ -57,7 +53,7 @@ Retrieving Data from Giant Bomb's API
     sort = "date_added:desc",
     field_list = c("date_added", "name", "id")
     )
-  #only GTA at the moment for testing purposes
+  #only GTA V at the moment for testing purposes
   review <- gb_reviews(
     n = 1,
     filter= "game:36765",
