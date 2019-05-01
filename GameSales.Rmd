@@ -1,0 +1,176 @@
+---
+title: "Game Sales Analysis"
+author: "Alexander King"
+date: "March 21, 2019"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#CSV of Video Game Sales
+Importing Video Game Sales Data
+```{r echo=FALSE}
+  require(data.table)
+  require(dplyr)
+  dataset <- as.data.table(read.csv("C:\\Users\\laifu\\Desktop\\CIS 585 Video Game Sales Analysis\\Video_Games_Sales_as_at_22_Dec_2016.csv"))
+  sales <- subset(dataset, select= -c(Year_of_Release, Publisher, NA_Sales, EU_Sales, JP_Sales, Other_Sales, Developer, Rating, Genre))
+    sales <- sales[Critic_Score != "NA"]
+    sales <- sales[User_Score != "NA"]
+    sales <- sales[User_Score != "tbd"]
+  sales <-sales %>%
+    group_by(Name) %>%
+    summarise(Sales = sum(Global_Sales), Critic_Score= mean(Critic_Score))
+  sales <- arrange(sales, desc(Sales))
+  sales <- as.data.table(sales[1:150,])
+  sales <- sales[-100]
+  sales <- sales[-138]
+  colnames(sales) <- c("Title","Sales","Critic_Score")
+  gamenames <- subset(sales, select = c(Title))
+```
+
+#Reddit API Data
+Retrieving Data from Reddit's API
+```{r echo=FALSE}
+  require(RedditExtractoR)
+  require(syuzhet)
+  iterate <- 1
+  links <- list()
+  game_sentiment <- tibble(Title = character(), Sentiment = numeric())
+  reddit_links <- data.frame(Date=as.Date(character()),
+                 File=character(), 
+                 User=character(), 
+                 stringsAsFactors=FALSE) 
+  comments <- data.frame(Date=as.Date(character()),
+                 File=character(), 
+                 User=character(), 
+                 stringsAsFactors=FALSE)
+  allcomms <- data.frame(Date=as.Date(character()),
+                 File=character(), 
+                 User=character(), 
+                 stringsAsFactors=FALSE)
+  
+  for(val in gamenames$Title){
+    links[[val]] <- reddit_urls(search_terms = toString(val), subreddit = "Games", cn_threshold =  15, sort_by = "relevance")
+  }
+  
+  for(val in links){
+    iteratecomm <- 1
+    templinks <-as.data.frame(links[iterate])
+    colnames(templinks)<- c("date","num_comments","title","subreddit","URL")
+    templinks <- subset(templinks, select=-c(date,num_comments,title,subreddit))
+    reddit_links <- rbind(templinks, reddit_links)
+    reddit_comments <- list()
+    for(uval in reddit_links$URL){
+      reddit_comments[[uval]] <- reddit_content(toString(uval))
+    }
+    for(uval in reddit_comments){
+      comments <- as.data.frame(reddit_comments[iteratecomm])
+      colnames(comments) <- 
+        c("id","structure","postdate","commdate","num_comments","subreddit","upvoteprop","post_score","author","user","comment_score","controversiality","comment","title",
+          "post_text","link","domain","URL")
+      comments <-
+        subset(comments, select=-c(id,structure,postdate,commdate,num_comments,subreddit,upvoteprop,post_score,author,user,
+                                   comment_score,controversiality,title,post_text,link,domain,URL))
+      allcomms <- rbind(comments,allcomms)
+      if(iteratecomm<length(reddit_comments)){
+        iteratecomm <- iteratecomm+1
+      }
+      comments <- data.frame(Date=as.Date(character()),
+                 File=character(), 
+                 User=character(), 
+                 stringsAsFactors=FALSE)
+    }
+    comment_matrix <- as.matrix(allcomms)
+    comment_vector = c()
+    for(i in seq(1:nrow(comment_matrix))){
+      comment_vector = c(comment_vector, comment_matrix[i,])
+    }
+    vector_sentiment <- get_sentiment(comment_vector,method="bing")
+    general_sentiment <-mean(vector_sentiment)
+    game_sentiment <-add_row(game_sentiment,Title = names(links[iterate]), Sentiment = general_sentiment)
+    iterate <- iterate+1
+    reddit_links <- data.frame(Date=as.Date(character()),
+                 File=character(), 
+                 User=character(), 
+                 stringsAsFactors=FALSE)
+    allcomms <- data.frame(Date=as.Date(character()),
+                 File=character(), 
+                 User=character(), 
+                 stringsAsFactors=FALSE)
+  }
+
+```
+
+#Combining Datasets
+```{r echo=FALSE}
+  require(dplyr)
+  full_dataset <- merge(game_sentiment,sales,all=TRUE)
+  full_dataset<- na.omit(full_dataset)
+
+```
+
+
+#Regression Model
+Design the regression line
+```{r echo=FALSE}
+    require(stargazer)
+    require(data.table)
+    sales_predictor <- lm(formula = full_dataset$Sales ~ full_dataset$Sentiment + full_dataset$Critic_Score, data=full_dataset)
+    plot(sales_predictor)
+    summary(sales_predictor)
+    sales_table <- stargazer(sales_predictor, type="text", title="Predictor", align=TRUE)
+```
+
+## Inputs and Outputs
+
+```{r eruptions, echo=FALSE}
+require(shiny)
+require(shinydashboard)
+require(DT)
+require(plotly)
+ui <- fluidPage(
+  titlePanel("Video Game Sales Predictors"),
+  sidebarPanel(
+    "test"
+  ),
+  mainPanel(
+    tabsetPanel(
+      tabPanel(h2("Data Set"),DT::dataTableOutput("full_dataset")),
+      tabPanel(h2("Linear Model"), plotlyOutput("sentimentplot"), br(),plotlyOutput("criticplot"))
+    )
+  )
+)
+server <- function(input, output){
+  
+  output$full_dataset = DT::renderDataTable({
+    full_dataset
+  })
+  output$sentimentplot = renderPlotly({
+    plot_ly(full_dataset, type="scatter",x= ~Sales, y = ~Sentiment)
+  })
+  output$criticplot = renderPlotly({
+    plot_ly(full_dataset,x= ~Sales, y = ~Critic_Score)
+  })
+}
+shinyApp(ui,server)
+
+```
+
+## Embedded Application
+
+It's also possible to embed an entire Shiny application within an R Markdown document using the `shinyAppDir` function. This example embeds a Shiny application located in another directory:
+
+```{r tabsets, echo=FALSE}
+shinyAppDir(
+  system.file("examples/06_tabsets", package = "shiny"),
+  options = list(
+    width = "100%", height = 550
+  )
+)
+```
+
+
+
